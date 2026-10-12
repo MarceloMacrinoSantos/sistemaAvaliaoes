@@ -1,0 +1,19 @@
+# Blueprint do Render: New + > Blueprint > selecione este repositório
+services:
+  - type: web
+    name: sistema-avaliacoes
+    runtime: docker
+    plan: free
+    region: virginia           # crie o banco do Neon na mesma região: AWS US East (N. Virginia)
+    healthCheckPath: /api/saude
+    envVars:
+      - key: DATABASE_URL        # cole a connection string do Neon (PostgreSQL gratuito)
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_LOGIN
+        value: admin
+      - key: ADMIN_SENHA         # senha inicial do administrador (troque depois)
+        sync: false
+      - key: BCRYPT_ROUNDS       # login mais leve na CPU reduzida do plano gratuito
+        value: "8"

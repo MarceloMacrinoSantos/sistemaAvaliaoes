@@ -1,0 +1,13 @@
+node_modules/
+# frontend/dist/ vai junto no pacote para dispensar o Node.js
+__pycache__/
+*.pyc
+*.db
+*.db-wal
+*.db-shm
+.venv/
+.env
+cloudflared
+cloudflared.exe
+link-internet.txt
+publicar-oracle.cfg

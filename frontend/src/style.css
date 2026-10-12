@@ -1,0 +1,118 @@
+:root {
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --texto: #1d2330;
+  --suave: #5f6b7a;
+  --borda: #dfe3e8;
+  --pri: #2856c8;
+  --pri-esc: #1d43a3;
+  --pri-claro: #e8eefc;
+  --ok: #1a7f4b;
+  --ok-claro: #e3f5ec;
+  --erro: #c0392b;
+  --erro-claro: #fdecea;
+  --alerta: #a86400;
+  --alerta-claro: #fff4e0;
+  --raio: 10px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--texto);
+  background: var(--bg);
+  line-height: 1.5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
+h3 { font-size: 1rem; margin: 0 0 .5rem; }
+a { color: var(--pri); }
+
+.topo { background: var(--card); border-bottom: 1px solid var(--borda); position: sticky; top: 0; z-index: 10; }
+.topo-in { max-width: 1100px; margin: 0 auto; padding: .6rem 1rem; display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap; }
+.marca { font-weight: 700; text-decoration: none; color: var(--texto); }
+.topo nav { display: flex; gap: 1rem; }
+.topo nav a { text-decoration: none; color: var(--suave); font-weight: 500; }
+.topo nav a.router-link-active { color: var(--pri); }
+.usuario { margin-left: auto; display: flex; gap: .75rem; align-items: center; font-size: .9rem; color: var(--suave); }
+
+.conteudo { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+.cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.sub { color: var(--suave); margin: 0; font-size: .95rem; }
+
+.card { background: var(--card); border: 1px solid var(--borda); border-radius: var(--raio); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.grade { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .25rem; color: var(--suave); }
+input, select, textarea {
+  width: 100%; padding: .55rem .7rem; border: 1px solid var(--borda); border-radius: 8px;
+  font: inherit; background: #fff; color: var(--texto);
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--pri-claro); border-color: var(--pri); }
+textarea { resize: vertical; min-height: 90px; }
+input[type=checkbox], input[type=radio] { width: auto; }
+.campo { margin-bottom: .85rem; }
+.linha { display: grid; gap: .85rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.check { display: flex; gap: .5rem; align-items: center; font-weight: 500; color: var(--texto); font-size: .95rem; }
+
+button, .btn {
+  display: inline-flex; align-items: center; gap: .35rem; padding: .55rem 1rem; border-radius: 8px; border: 1px solid var(--pri);
+  background: var(--pri); color: #fff; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+button:hover, .btn:hover { background: var(--pri-esc); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.sec { background: #fff; color: var(--pri); }
+.sec:hover { background: var(--pri-claro); }
+.perigo { background: #fff; color: var(--erro); border-color: var(--erro); }
+.perigo:hover { background: var(--erro-claro); }
+.pequeno { padding: .3rem .65rem; font-size: .85rem; }
+.btn-link { background: none; border: none; color: var(--pri); padding: 0; font-weight: 500; }
+.btn-link:hover { background: none; text-decoration: underline; }
+.acoes { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+
+table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+th, td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid var(--borda); vertical-align: middle; }
+th { color: var(--suave); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .02em; }
+.tabela-rola { overflow-x: auto; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.tag { display: inline-block; padding: .1rem .55rem; border-radius: 99px; font-size: .78rem; font-weight: 600; background: var(--pri-claro); color: var(--pri); }
+.tag.ok { background: var(--ok-claro); color: var(--ok); }
+.tag.erro { background: var(--erro-claro); color: var(--erro); }
+.tag.alerta { background: var(--alerta-claro); color: var(--alerta); }
+.tag.cinza { background: #eceff3; color: var(--suave); }
+
+.aviso { padding: .7rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: .95rem; }
+.aviso.erro { background: var(--erro-claro); color: var(--erro); }
+.aviso.ok { background: var(--ok-claro); color: var(--ok); }
+.aviso.info { background: var(--pri-claro); color: var(--pri-esc); }
+.aviso.alerta { background: var(--alerta-claro); color: var(--alerta); }
+
+.abas { display: flex; gap: .25rem; border-bottom: 1px solid var(--borda); margin-bottom: 1rem; overflow-x: auto; }
+.abas button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; color: var(--suave); padding: .6rem .9rem; }
+.abas button.ativa { color: var(--pri); border-bottom-color: var(--pri); }
+.abas button:hover { background: none; color: var(--pri); }
+
+.vazio { text-align: center; color: var(--suave); padding: 2rem 1rem; }
+.enunciado { white-space: pre-wrap; margin: 0 0 .75rem; }
+
+/* alternativas (aluno) */
+.alternativa {
+  display: flex; gap: .7rem; align-items: flex-start; padding: .7rem .85rem; border: 1px solid var(--borda);
+  border-radius: 8px; margin-bottom: .5rem; cursor: pointer; background: #fff; color: var(--texto); font-weight: 400; font-size: 1rem;
+}
+.alternativa:hover { border-color: var(--pri); }
+.alternativa.marcada { border-color: var(--pri); background: var(--pri-claro); }
+.alternativa .letra { font-weight: 700; min-width: 1.4rem; }
+.alternativa.certa { border-color: var(--ok); background: var(--ok-claro); }
+.alternativa.errada { border-color: var(--erro); background: var(--erro-claro); }
+
+.modal-fundo { position: fixed; inset: 0; background: rgba(20, 25, 35, .45); display: flex; align-items: flex-start; justify-content: center; padding: 3vh 1rem; z-index: 50; overflow-y: auto; }
+.modal { background: var(--card); border-radius: var(--raio); padding: 1.25rem; width: 100%; max-width: 820px; }
+
+.barra { height: 8px; border-radius: 99px; background: #eceff3; overflow: hidden; }
+.barra > span { display: block; height: 100%; background: var(--pri); }
+
+@media (max-width: 600px) {
+  .conteudo { padding: 1rem .75rem 4rem; }
+  .card { padding: .9rem; }
+  .topo nav { order: 3; width: 100%; }
+}
