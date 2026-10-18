@@ -14,6 +14,7 @@ from ..acesso import avaliacao_do_usuario, eh_admin, par_permitido, turma_do_usu
 from ..auth import exige_professor
 from ..importacao import EXTENSOES_PROVA, MARCA_IMG_ARQUIVO, ErroImportacao, extrair_linhas, interpretar_prova
 from .cadastros import ler_upload
+from .. import fila_ia, ia
 from ..correcao import corrigir_tentativa, recalcular_nota
 from ..db import get_db
 from ..imagens import ErroImagem, MARCADOR, gravar, marcador, sem_imagens
@@ -42,6 +43,7 @@ class AvaliacaoIn(BaseModel):
     peso_objetiva: float = Field(default=1.0, gt=0, le=100)
     peso_dissertativa: float = Field(default=2.0, gt=0, le=100)
     monitorar: bool = True
+    correcao_ia: Literal["desligada", "sugestao", "automatica"] = "desligada"
 
     @model_validator(mode="after")
     def _datas(self):
@@ -74,7 +76,7 @@ def _av_out(av: Avaliacao, db: Session, completo: bool = False) -> dict:
         "liberar_resultado": av.liberar_resultado, "resultado_liberado": av.resultado_liberado,
         "publicada": av.publicada, "status": _status(av),
         "nota_total": av.nota_total, "peso_objetiva": av.peso_objetiva, "peso_dissertativa": av.peso_dissertativa,
-        "monitorar": av.monitorar,
+        "monitorar": av.monitorar, "correcao_ia": av.correcao_ia or "desligada",
         "qtd_questoes": len(av.questoes), "pontuacao_total": round(sum(q.pontos for q in av.questoes), 2),
         "qtd_tentativas": db.scalar(select(func.count()).select_from(Tentativa)
                                     .where(Tentativa.avaliacao_id == av.id)),
@@ -144,12 +146,16 @@ def editar(aid: int, dados: AvaliacaoIn, db: Session = Depends(get_db), u: Usuar
     _validar_destino(db, u, dados.escola_id, dados.turma_id, dados.disciplina_id)
     if dados.nota_total != av.nota_total and _tem_tentativas(db, av):
         raise HTTPException(400, "Não é possível mudar a nota total depois que alunos iniciaram a avaliação")
+    modo_antes = av.correcao_ia or "desligada"
     for k, v in dados.model_dump().items():
         setattr(av, k, v)
     av.inicio, av.fim = para_utc(dados.inicio), para_utc(dados.fim)
     if not _tem_tentativas(db, av):
         redistribuir_pontos(av)
+    if modo_antes != av.correcao_ia:
+        _reaplicar_ia(db, av, enfileirar=av.correcao_ia != "desligada")
     db.commit()
+    fila_ia.avisar()
     return _av_out(av, db, completo=True)
 
 
@@ -171,7 +177,8 @@ def duplicar(aid: int, turma_id: int | None = None, db: Session = Depends(get_db
                      professor_id=prof.id, inicio=av.inicio, fim=av.fim, duracao_min=av.duracao_min,
                      embaralhar_questoes=av.embaralhar_questoes, embaralhar_alternativas=av.embaralhar_alternativas,
                      liberar_resultado=av.liberar_resultado, publicada=False, nota_total=av.nota_total,
-                     peso_objetiva=av.peso_objetiva, peso_dissertativa=av.peso_dissertativa, monitorar=av.monitorar)
+                     peso_objetiva=av.peso_objetiva, peso_dissertativa=av.peso_dissertativa, monitorar=av.monitorar,
+                     correcao_ia=av.correcao_ia)
     for q in av.questoes:
         nq = Questao(tipo=q.tipo, enunciado=q.enunciado, pontos=q.pontos, peso=q.peso, ordem=q.ordem, explicacao=q.explicacao,
                      gabarito_texto=q.gabarito_texto, palavras_chave=list(q.palavras_chave or []))
@@ -423,6 +430,7 @@ def resultados(aid: int, db: Session = Depends(get_db), u: Usuario = Depends(exi
                        "dissertativas_nao_revisadas": pendente,
                        "monitoramento": monitoramento_out(t, incluir_eventos=False) if t else None})
 
+    ia_resumo = fila_ia.pendentes(db, aid) if (av.correcao_ia or "desligada") != "desligada" else None
     # estatística por questão
     stats = []
     enviados = [t for t in tentativas.values() if t.enviado_em]
@@ -447,7 +455,8 @@ def resultados(aid: int, db: Session = Depends(get_db), u: Usuario = Depends(exi
         "resumo": {"total_alunos": len(linhas), "enviadas": len(enviados),
                    "media": round(sum(notas) / len(notas), 2) if notas else None,
                    "maior": max(notas) if notas else None, "menor": min(notas) if notas else None,
-                   "resultado_visivel_para_alunos": resultado_visivel(av, enviados[0]) if enviados else False},
+                   "resultado_visivel_para_alunos": resultado_visivel(av, enviados[0]) if enviados else False,
+                   "ia": ia_resumo},
     }
 
 
@@ -532,6 +541,109 @@ def reabrir_tentativa(tid: int, db: Session = Depends(get_db), u: Usuario = Depe
 class RevisaoIn(BaseModel):
     pontos: float | None = Field(default=None, ge=0)
     comentario: str | None = None
+
+
+# ---------- correção por IA ----------
+def _respostas_dissertativas(db: Session, av: Avaliacao) -> list[Resposta]:
+    return list(db.scalars(select(Resposta).join(Tentativa, Tentativa.id == Resposta.tentativa_id)
+                           .join(Questao, Questao.id == Resposta.questao_id)
+                           .where(Tentativa.avaliacao_id == av.id, Tentativa.enviado_em.is_not(None),
+                                  Questao.tipo == "dissertativa")))
+
+
+def _reaplicar_ia(db: Session, av: Avaliacao, enfileirar: bool, somente_falhas: bool = False) -> int:
+    """Põe na fila (ou tira) as dissertativas já enviadas e recalcula as notas conforme o modo da avaliação."""
+    n = 0
+    tentativas = set()
+    for r in _respostas_dissertativas(db, av):
+        if enfileirar and (r.texto or "").strip() and r.ia_status != "processando" and \
+                (not somente_falhas or r.ia_status in (None, "falhou")):
+            if ia.configurada():
+                r.ia_status, r.ia_tentativas, r.ia_erro, r.ia_em = "pendente", 0, None, None
+                n += 1
+            else:
+                r.ia_status, r.ia_erro = "falhou", "nenhuma chave de IA configurada no servidor"
+        fila_ia.aplicar(r)
+        tentativas.add(r.tentativa)
+    for t in tentativas:
+        recalcular_nota(t)
+    return n
+
+
+@router.get("/ia/status")
+def ia_status(db: Session = Depends(get_db), u: Usuario = Depends(exige_professor)):
+    return {"configurada": ia.configurada(), "ordem": ia.ordem(), "provedores": ia.status(),
+            "fila": fila_ia.pendentes(db)}
+
+
+class TesteIAIn(BaseModel):
+    provedor: str | None = None
+
+
+@router.post("/ia/testar")
+def ia_testar(dados: TesteIAIn, u: Usuario = Depends(exige_professor)):
+    """Corrige uma resposta de exemplo com cada IA configurada (para conferir se a chave funciona)."""
+    alvo = [dados.provedor] if dados.provedor else [p["id"] for p in ia.status() if p["configurado"]]
+    if not alvo:
+        raise HTTPException(400, "Nenhuma chave de IA configurada no servidor (veja o GUIA-IA.md)")
+    ia.desbloquear()
+    out = []
+    for p in alvo:
+        try:
+            r = ia.corrigir("Explique o que é um commit no Git.", "Um commit registra uma versão do projeto no "
+                            "histórico local, com autor, data e mensagem.", "Definir commit; citar histórico; "
+                            "citar autor ou mensagem.", ["commit", "histórico", "autor|mensagem"], 1.0,
+                            "O commit salva uma foto do projeto no histórico, com quem fez e a mensagem.",
+                            provedores=[p])
+            out.append({"provedor": p, "ok": True, "pontos": r["pontos"], "feedback": r["feedback"],
+                        "modelo": r["provedor"]})
+        except ia.ErroIA as e:
+            out.append({"provedor": ia.PROVEDORES.get(p, {}).get("nome", p), "ok": False,
+                        "erro": str(e).removeprefix(f"{p}: ")})
+    return {"resultados": out}
+
+
+@router.post("/avaliacoes/{aid}/ia/reprocessar")
+def ia_reprocessar(aid: int, somente_falhas: bool = True, db: Session = Depends(get_db),
+                   u: Usuario = Depends(exige_professor)):
+    av = _get_av(db, aid, u)
+    if (av.correcao_ia or "desligada") == "desligada":
+        raise HTTPException(400, "Ative a correção por IA nesta avaliação (Editar → Correção das dissertativas)")
+    if not ia.configurada():
+        raise HTTPException(400, "Nenhuma chave de IA configurada no servidor (veja o GUIA-IA.md)")
+    ia.desbloquear()
+    n = _reaplicar_ia(db, av, enfileirar=True, somente_falhas=somente_falhas)
+    db.commit()
+    fila_ia.avisar()
+    return {"enfileiradas": n}
+
+
+def _aceitar(r: Resposta) -> bool:
+    if r.ia_status != "ok" or r.ia_pontos is None:
+        return False
+    r.pontos_revisados = r.ia_pontos
+    r.feedback_auto = "Correção por IA: " + (r.ia_feedback or "")
+    recalcular_nota(r.tentativa)
+    return True
+
+
+@router.post("/respostas/{rid}/aceitar-ia")
+def ia_aceitar(rid: int, db: Session = Depends(get_db), u: Usuario = Depends(exige_professor)):
+    r = db.get(Resposta, rid) or _404()
+    avaliacao_do_usuario(u, r.tentativa.avaliacao)
+    if not _aceitar(r):
+        raise HTTPException(400, "Esta resposta ainda não tem nota da IA")
+    db.commit()
+    return {"ok": True, "nota": r.tentativa.nota}
+
+
+@router.post("/avaliacoes/{aid}/ia/aceitar-todas")
+def ia_aceitar_todas(aid: int, db: Session = Depends(get_db), u: Usuario = Depends(exige_professor)):
+    """Aceita a nota da IA em todas as dissertativas que o professor ainda não revisou."""
+    av = _get_av(db, aid, u)
+    n = sum(1 for r in _respostas_dissertativas(db, av) if r.pontos_revisados is None and _aceitar(r))
+    db.commit()
+    return {"aceitas": n}
 
 
 @router.put("/respostas/{rid}/revisar")

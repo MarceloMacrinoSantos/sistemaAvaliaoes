@@ -89,7 +89,7 @@ async function cadastrar() {
         {{ carregando ? 'Criando…' : 'Criar conta e entrar' }}</button>
       <p style="text-align: center; margin-top: 1rem"><button type="button" class="btn-link" @click="modo = 'entrar'; erro = ''">← Já tenho conta</button></p>
     </form>
-    <p class="versao"><router-link to="/qrcode">📱 QR code para os alunos entrarem pelo celular</router-link> · versão 19</p>
+    <p class="versao"><router-link to="/qrcode">📱 QR code para os alunos entrarem pelo celular</router-link> · versão 20</p>
   </div>
 </template>
 

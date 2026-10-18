@@ -107,6 +107,10 @@ def feedback_tentativa(t: Tentativa, incluir_aluno: bool = False) -> dict:
         else:
             item["resposta_texto"] = r.texto if r else None
             item["gabarito"] = q.gabarito_texto
+            if incluir_aluno and r:  # visão do professor: as duas correções lado a lado
+                item["ia"] = {"modo": av.correcao_ia or "desligada", "status": r.ia_status, "pontos": r.ia_pontos,
+                              "feedback": r.ia_feedback, "provedor": r.ia_provedor, "erro": r.ia_erro,
+                              "pontos_chaves": r.pontos_chaves, "feedback_chaves": r.feedback_chaves}
         itens.append(item)
 
     acertos = sum(1 for i in itens if i["situacao"] == "certa")

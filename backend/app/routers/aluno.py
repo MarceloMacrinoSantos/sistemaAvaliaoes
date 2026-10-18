@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from ..auth import exige_aluno
+from .. import fila_ia
 from ..correcao import corrigir_tentativa
 from ..db import get_db
 from ..models import Avaliacao, Evento, Matricula, Questao, Resposta, Tentativa, Usuario, agora
@@ -252,6 +253,7 @@ def enviar(tid: int, request: Request, db: Session = Depends(get_db), aluno: Usu
         if not automatico:  # o envio automático já é registrado na correção
             t.eventos.append(Evento(tipo="envio", ip=t.ip_envio, navegador=t.navegador_envio))
         db.commit()
+        fila_ia.avisar()
     return {"ok": True, "resultado_disponivel": resultado_visivel(t.avaliacao, t),
             "fim_avaliacao": iso(t.avaliacao.fim)}
 

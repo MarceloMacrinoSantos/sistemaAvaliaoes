@@ -35,6 +35,8 @@ def _inicializar():
 @asynccontextmanager
 async def lifespan(_app):
     _inicializar()
+    from .fila_ia import iniciar
+    iniciar()  # correção por IA em segundo plano (só trabalha se houver chave configurada)
     yield
 
 
@@ -82,7 +84,7 @@ def acesso(request: Request):
 
 @app.get("/api/saude")
 def saude():
-    return {"ok": True, "versao": 19}
+    return {"ok": True, "versao": 20}
 
 
 # ---------- frontend (Vue) compilado, servido pelo próprio backend ----------

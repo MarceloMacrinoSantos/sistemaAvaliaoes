@@ -121,10 +121,29 @@ def corrigir_tentativa(t: Tentativa, automatico: bool = False) -> None:
             r.pontos_auto, r.situacao, r.feedback_auto = corrigir_objetiva(q, r.alternativa_id)
         else:
             r.pontos_auto, r.situacao, r.feedback_auto = corrigir_dissertativa(q, r.texto)
+            r.pontos_chaves, r.feedback_chaves = r.pontos_auto, r.feedback_auto
+            _preparar_ia(t, q, r)
         total += r.pontos_finais
         maximo += q.pontos
     t.nota = round(total, 2)
     t.nota_max = round(maximo, 2)
+
+
+def _preparar_ia(t: Tentativa, q: Questao, r: Resposta) -> None:
+    """Põe a dissertativa na fila da IA (a nota por palavras-chave já vale enquanto isso)."""
+    modo = getattr(t.avaliacao, "correcao_ia", None) or "desligada"
+    if modo == "desligada" or r.ia_status in ("ok", "pendente", "processando"):
+        if r.ia_status == "ok":
+            from .fila_ia import aplicar
+            aplicar(r)  # mantém a nota da IA (modo automático) se a correção for refeita
+        return
+    if not (r.texto or "").strip():
+        return  # em branco: vale 0, não precisa de IA
+    from . import ia
+    if not ia.configurada():
+        r.ia_status, r.ia_erro = "falhou", "nenhuma chave de IA configurada no servidor"
+        return
+    r.ia_status, r.ia_tentativas, r.ia_erro, r.ia_em = "pendente", 0, None, None
 
 
 def recalcular_nota(t: Tentativa) -> None:

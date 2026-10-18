@@ -50,6 +50,24 @@ async function salvarRevisao() {
     carregar()
   } catch (e) { alert(e.message) }
 }
+async function aceitarIa(q) {
+  try {
+    await api(`/api/respostas/${q.resposta_id}/aceitar-ia`, { method: 'POST' })
+    detalhe.value = await api(`/api/tentativas/${detalhe.value.tentativa_id}`)
+    carregar()
+  } catch (e) { alert(e.message) }
+}
+async function aceitarTodasIa() {
+  if (!confirm('Usar a nota da IA em todas as dissertativas que você ainda não revisou?')) return
+  try { const r = await api(`/api/avaliacoes/${props.id}/ia/aceitar-todas`, { method: 'POST' }); alert(`${r.aceitas} nota(s) da IA aplicada(s).`); carregar() }
+  catch (e) { alert(e.message) }
+}
+async function reprocessarIa(somenteFalhas = true) {
+  try {
+    const r = await api(`/api/avaliacoes/${props.id}/ia/reprocessar?somente_falhas=${somenteFalhas}`, { method: 'POST' })
+    alert(`${r.enfileiradas} resposta(s) enviada(s) para a IA. A tela se atualiza sozinha.`); carregar()
+  } catch (e) { alert(e.message) }
+}
 async function liberar(v) {
   await api(`/api/avaliacoes/${props.id}/liberar-resultado?liberar=${v}`, { method: 'POST' })
   carregar()
@@ -99,6 +117,22 @@ async function reabrir(l) {
         </div>
         <button v-if="!dados.avaliacao.resultado_liberado && !dados.resumo.resultado_visivel_para_alunos" class="pequeno" @click="liberar(true)">Liberar agora</button>
         <button v-else-if="dados.avaliacao.resultado_liberado" class="sec pequeno" @click="liberar(false)">Desfazer liberação manual</button>
+      </div>
+    </div>
+
+    <div v-if="dados.resumo.ia" class="card" style="margin-bottom: 1rem">
+      <div class="acoes" style="justify-content: space-between">
+        <div><strong>🤖 Correção por IA</strong>
+          <small class="sub"> ({{ dados.avaliacao.correcao_ia === 'automatica' ? 'a nota da IA vale; palavras-chave são a reserva' : 'a IA sugere; você aceita' }})</small><br />
+          <span class="tag ok">{{ dados.resumo.ia.ok }} corrigida(s)</span>
+          <span v-if="dados.resumo.ia.pendentes" class="tag cinza">⏳ {{ dados.resumo.ia.pendentes }} na fila</span>
+          <span v-if="dados.resumo.ia.falhou" class="tag alerta" title="Nestas vale a nota por palavras-chave">{{ dados.resumo.ia.falhou }} sem IA (vale palavras-chave)</span>
+        </div>
+        <div class="acoes">
+          <button v-if="dados.avaliacao.correcao_ia === 'sugestao' && dados.resumo.ia.ok" class="pequeno" @click="aceitarTodasIa">Aceitar todas as notas da IA</button>
+          <button v-if="dados.resumo.ia.falhou" class="sec pequeno" @click="reprocessarIa(true)">Tentar de novo as que falharam</button>
+          <button class="sec pequeno" @click="reprocessarIa(false)" title="Corrige de novo todas as dissertativas com a IA">Recorrigir tudo com IA</button>
+        </div>
       </div>
     </div>
 
@@ -169,7 +203,7 @@ async function reabrir(l) {
         <div><h2 style="margin: 0">{{ detalhe.aluno.nome }}</h2><small class="sub">Enviado em {{ fmtData(detalhe.enviado_em) }}</small></div>
         <button class="sec" @click="detalhe = null">Fechar</button>
       </div>
-      <Feedback :dados="detalhe" revisavel @revisar="revisar" />
+      <Feedback :dados="detalhe" revisavel @revisar="revisar" @aceitar-ia="aceitarIa" />
     </div>
   </div>
 

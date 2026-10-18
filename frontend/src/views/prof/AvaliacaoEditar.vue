@@ -22,8 +22,19 @@ const form = ref({
   fim: paraInputLocal(new Date(hoje.getTime() + 2 * 3600e3).toISOString()),
   duracao_min: 60, embaralhar_questoes: true, embaralhar_alternativas: true,
   liberar_resultado: 'apos_fim', publicada: false,
-  nota_total: 10, peso_objetiva: 1, peso_dissertativa: 2, monitorar: true
+  nota_total: 10, peso_objetiva: 1, peso_dissertativa: 2, monitorar: true, correcao_ia: 'desligada'
 })
+const iaInfo = ref(null)
+const iaTeste = ref(null)
+const testandoIa = ref(false)
+async function carregarIa() { try { iaInfo.value = await api('/api/ia/status') } catch {} }
+async function testarIa() {
+  testandoIa.value = true; iaTeste.value = null
+  try { iaTeste.value = (await api('/api/ia/testar', { method: 'POST', body: {} })).resultados }
+  catch (e) { iaTeste.value = [{ provedor: '—', ok: false, erro: e.message }] }
+  finally { testandoIa.value = false; carregarIa() }
+}
+
 const questoes = ref([])
 const qtdTentativas = ref(0)
 const bloqueada = computed(() => qtdTentativas.value > 0)
@@ -97,6 +108,7 @@ function marcarCorreta(i) { qForm.value.alternativas.forEach((a, j) => (a.corret
 function avisar(texto, tipo = 'ok') { msg.value = { texto, tipo }; window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
 onMounted(async () => {
+  carregarIa()
   ;[escolas.value, turmas.value, disciplinas.value] = await Promise.all([
     api('/api/escolas'), api('/api/turmas'), api('/api/disciplinas')])
   if (props.id) {
@@ -245,6 +257,36 @@ async function mover(i, d) {
           <option value="apos_envio">Imediatamente após enviar</option>
           <option value="manual">Quando eu liberar manualmente</option>
         </select></div>
+    </div>
+    <div class="campo caixa-ia">
+      <label>Correção das dissertativas</label>
+      <select v-model="form.correcao_ia">
+        <option value="desligada">Palavras-chave e resposta esperada (sem IA)</option>
+        <option value="sugestao">IA sugere a nota — eu confiro e aceito</option>
+        <option value="automatica">IA corrige — palavras-chave como reserva se a IA falhar</option>
+      </select>
+      <small class="sub" v-if="form.correcao_ia !== 'desligada'">
+        A IA recebe só o enunciado, a resposta esperada, a explicação/critérios e o texto do aluno — nunca o nome ou o RM.
+        A nota por palavras-chave vale enquanto a IA corrige e continua valendo se a IA falhar.
+        <template v-if="form.correcao_ia === 'automatica' && form.liberar_resultado === 'apos_envio'">
+          Com o feedback "imediatamente após enviar", o aluno pode ver primeiro a nota por palavras-chave.</template>
+      </small>
+      <div v-if="form.correcao_ia !== 'desligada' && iaInfo" class="sub" style="margin-top: .35rem">
+        <template v-if="iaInfo.configurada">
+          IA disponível, na ordem:
+          <span v-for="p in iaInfo.provedores.filter(x => x.configurado).sort((a, b) => iaInfo.ordem.indexOf(a.id) - iaInfo.ordem.indexOf(b.id))"
+            :key="p.id" class="tag" :class="p.bloqueado_min ? 'alerta' : 'ok'" :title="p.ultimo_erro || p.modelo">
+            {{ p.nome }}<template v-if="p.bloqueado_min"> · pausada {{ p.bloqueado_min }} min</template></span>
+          <button type="button" class="sec pequeno" :disabled="testandoIa" @click="testarIa">
+            {{ testandoIa ? 'Testando…' : 'Testar IA' }}</button>
+        </template>
+        <span v-else class="tag alerta">Nenhuma chave de IA configurada no servidor — vale só a correção por palavras-chave
+          (veja o GUIA-IA.md)</span>
+      </div>
+      <div v-for="t in iaTeste || []" :key="t.provedor" class="aviso" :class="t.ok ? 'ok' : 'erro'" style="margin: .4rem 0 0">
+        <template v-if="t.ok"><strong>{{ t.modelo }}</strong> respondeu: nota {{ t.pontos }} de 1 — {{ t.feedback }}</template>
+        <template v-else><strong>{{ t.provedor }}</strong> falhou: {{ t.erro }}</template>
+      </div>
     </div>
     <div class="acoes">
       <button :disabled="salvando">{{ id ? 'Salvar' : 'Criar e adicionar questões' }}</button>

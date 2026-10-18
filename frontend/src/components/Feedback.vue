@@ -6,7 +6,7 @@ import Monitoramento from './Monitoramento.vue'
 
 // Relatório de correção questão a questão, usado pelo aluno e pelo professor.
 const props = defineProps({ dados: Object, revisavel: Boolean })
-const emit = defineEmits(['revisar'])
+const emit = defineEmits(['revisar', 'aceitar-ia'])
 
 const LETRAS = 'ABCDEFGHIJ'
 const CLASSE = { certa: 'ok', errada: 'erro', parcial: 'alerta', em_branco: 'cinza', pendente: 'cinza' }
@@ -17,7 +17,7 @@ const contagem = computed(() => {
   props.dados.questoes.forEach((q) => c[q.situacao]++)
   return c
 })
-const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString('pt-BR')
+const fmt = (n) => (n == null ? '—' : (Math.round(n * 100) / 100).toLocaleString('pt-BR'))
 </script>
 
 <template>
@@ -65,6 +65,22 @@ const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString('pt-BR')
         <label style="margin-top: .6rem">Resposta esperada</label>
         <TextoComImagens class="resposta-texto gabarito" :texto="q.gabarito" />
       </template>
+      <div v-if="revisavel && q.ia && q.ia.modo !== 'desligada' && q.ia.status" class="caixa-ia-resp">
+        <div class="acoes" style="justify-content: space-between">
+          <strong>🤖 Correção por IA</strong>
+          <span v-if="q.ia.status === 'ok'" class="tag ok">{{ fmt(q.ia.pontos) }} / {{ fmt(q.pontos_max) }} pt</span>
+          <span v-else-if="q.ia.status === 'falhou'" class="tag alerta" :title="q.ia.erro">IA indisponível — vale palavras-chave</span>
+          <span v-else class="tag cinza">⏳ corrigindo…</span>
+        </div>
+        <p v-if="q.ia.status === 'ok'" style="margin: .3rem 0">{{ q.ia.feedback }}</p>
+        <p v-if="q.ia.status === 'falhou'" class="sub" style="margin: .3rem 0">Motivo: {{ q.ia.erro }}</p>
+        <small class="sub">Palavras-chave: {{ fmt(q.ia.pontos_chaves) }} pt<template v-if="q.ia.provedor"> · {{ q.ia.provedor }}</template>
+          <template v-if="q.ia.status === 'ok' && Math.abs((q.ia.pontos || 0) - (q.ia.pontos_chaves || 0)) >= q.pontos_max * 0.4">
+            · <strong style="color: var(--alerta)">as duas correções discordam bastante: confira</strong></template></small>
+        <div v-if="q.ia.status === 'ok' && q.resposta_id && q.pontos !== q.ia.pontos" style="margin-top: .4rem">
+          <button class="pequeno" @click="emit('aceitar-ia', q)">Usar a nota da IA ({{ fmt(q.ia.pontos) }})</button>
+        </div>
+      </div>
       <p v-if="q.feedback && q.situacao !== 'em_branco'" class="sub" style="margin: .5rem 0 0">
         <strong>Correção automática:</strong> {{ q.feedback }}
         <span v-if="q.revisado"> · <em>nota revisada pelo professor</em></span>
@@ -92,4 +108,5 @@ const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString('pt-BR')
 .q-parcial { border-left-color: var(--alerta); }
 .resposta-texto { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--borda); border-radius: 8px; padding: .6rem .8rem; }
 .gabarito { background: var(--ok-claro); border-color: #bfe3cf; }
+.caixa-ia-resp { margin-top: .6rem; padding: .55rem .7rem; border: 1px dashed var(--borda, #ccc); border-radius: 8px; }
 </style>

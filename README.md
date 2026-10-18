@@ -9,6 +9,8 @@ Sistema para cadastrar **provas, testes e simulados** por **escola, turma e disc
 
 ## Funcionalidades
 
+- **Correção por IA** (v20): Claude, Gemini ou DeepSeek corrigem as dissertativas (sugestão ou automática), com troca automática entre as IAs e reserva pela correção por palavras-chave se todas falharem. Configuração em **[GUIA-IA.md](GUIA-IA.md)**.
+
 - **QR code de acesso** (v18): o aluno escaneia com o celular, entra com RM e senha e cai direto nas provas dele. Aparece na janela do `iniciar.bat`, no botão **📱 QR code para os alunos** do painel e na página `/qrcode` (para projetar ou imprimir). Usa automaticamente o endereço da rede (ou o endereço da internet, quando publicado).
 
 - **Imagens nas questões** (v17): no enunciado, nas alternativas, na resposta esperada e na explicação. Botão 🖼 Imagem, colar print (Ctrl+V) ou arrastar o arquivo; as figuras de um .docx importado entram automaticamente. O aluno clica para ampliar sem sair da prova. As imagens são reduzidas (máx. 1600 px) e guardadas no próprio banco, então vão junto ao copiar a pasta ou fazer backup.

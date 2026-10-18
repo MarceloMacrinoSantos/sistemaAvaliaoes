@@ -17,3 +17,6 @@ services:
         sync: false
       - key: BCRYPT_ROUNDS       # login mais leve na CPU reduzida do plano gratuito
         value: "8"
+# Correção por IA (opcional): adicione no painel do Render, em Environment, UMA ou mais destas chaves:
+#   ANTHROPIC_API_KEY  GEMINI_API_KEY  DEEPSEEK_API_KEY   (e, se quiser, IA_ORDEM=gemini,claude,deepseek)
+# Veja GUIA-IA.md. Não coloque chaves neste arquivo.

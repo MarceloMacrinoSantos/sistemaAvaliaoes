@@ -113,6 +113,9 @@ class Avaliacao(Base):
     peso_objetiva: Mapped[float] = mapped_column(Float, default=1.0)       # peso sugerido para novas objetivas
     peso_dissertativa: Mapped[float] = mapped_column(Float, default=2.0)   # peso sugerido para novas dissertativas
     monitorar: Mapped[bool] = mapped_column(Boolean, default=True)         # registrar saídas de aba/janela
+    # dissertativas: desligada (só palavras-chave) | sugestao (IA sugere, professor confirma)
+    # | automatica (vale a nota da IA; palavras-chave ficam como reserva se a IA falhar)
+    correcao_ia: Mapped[str] = mapped_column(String(20), default="desligada")
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
     escola: Mapped[Escola] = relationship()
@@ -211,6 +214,17 @@ class Resposta(Base):
     feedback_auto: Mapped[str | None] = mapped_column(Text, nullable=True)
     pontos_revisados: Mapped[float | None] = mapped_column(Float, nullable=True)
     comentario_professor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # correção por palavras-chave guardada à parte (é a reserva quando a IA falha)
+    pontos_chaves: Mapped[float | None] = mapped_column(Float, nullable=True)
+    feedback_chaves: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # correção por IA: pendente | processando | ok | falhou
+    ia_status: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    ia_pontos: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ia_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ia_provedor: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ia_erro: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    ia_tentativas: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ia_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     tentativa: Mapped[Tentativa] = relationship(back_populates="respostas")
     questao: Mapped[Questao] = relationship()
